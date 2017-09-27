@@ -7,16 +7,22 @@ os.chdir('/Users/DexterIII/Documents/Werk/PhD/research/projects/burst_phase/work
 import numpy as np
 import scipy as sp
 import scipy.optimize as opt
-from scipy.stats import poisson
 import matplotlib.pyplot as plt
+import time as tm
+import sys
 
 from numpy import pi,radians,arcsin,cos,sin,sqrt,arccos,exp,log
+from math import ceil
 from scipy import integrate, interpolate
+from scipy.stats import poisson
     
 def A(r):
     return 1 - 1 / r
+
+cSB = 'SteelBlue'
     
 #%%
+
 if not os.path.isdir('theta_star_inf_out'):
        os.makedirs('theta_star_inf_out')
 
@@ -56,63 +62,13 @@ b_max = R * A(R)**(-1/2)
 b, theta_star = np.transpose(np.loadtxt('theta_star_inf_out/theta_star_inf_R_{0}_Nu_{1}_Nb_{2}'.format(R,int(np.log10(N_u)),int(np.log10(N_b)))))
 theta_star_b = interpolate.interp1d(b,theta_star)
 
-cSB = 'SteelBlue'
-
 fig, ax = plt.subplots(1,1,figsize=(6,4))
 ax.plot(b,theta_star,color = cSB) 
-ax.axvline(b_max * (1-1e-6),color='k',linestyle='dashed')
+ax.axvline(b_max,color='k',linestyle='dashed')
 ax.set_xlabel(r'$b$')
 ax.set_ylabel(r'$ \theta_*(b) $')
 ax.set_title(r'$R = {0}$'.format(R))
 plt.show()
-
-#%%
-
-##%%
-#
-#if not os.path.isdir('Dt_star_inf_out'):
-#       os.makedirs('Dt_star_inf_out')
-#
-#def Dt_star_inf(R,N_b):
-#    
-#    b_max = R * A(R)**(-1/2)
-#    
-#    def integral(b):
-#        
-#        intgrand = lambda r: 1 / (1 - 1 / r) * ((1 - (b / r)**2 * (1 - 1 / r))**(-1/2) - 1)
-#        intgrated  = integrate.quad(intgrand,R,np.inf)[0]
-#        return intgrated
-#    
-#    b_array = np.linspace(0,b_max,int(N_b),endpoint=True)
-#    Dt_star_array = [integral(b_i) for b_i in b_array]
-#    Dt_star_data = np.transpose([b_array,Dt_star_array])
-#    
-#    logN_b = int(np.log10(N_b))
-#    
-#    np.savetxt('Dt_star_inf_out/Dt_star_inf_R_{0}_Nb_{1}'.format(R,logN_b),Dt_star_data,delimiter=' ')    
-#
-##%%
-#
-#Dt_star_inf(2.5,1e5)
-#
-##%%
-#
-#R = 2.5
-#N_b = 1e5
-#
-#b_max = R * A(R)**(-1/2)
-#
-#b, Dt_star = np.transpose(np.loadtxt('Dt_star_inf_out/Dt_star_inf_R_{0}_Nb_{1}'.format(R,int(np.log10(N_b)))))
-#Dt_star_b = interpolate.interp1d(b,Dt_star)
-#
-#fig, ax = plt.subplots(1,1,figsize=(6,4))
-#ax.plot(b,T_star,color = cSB) 
-#ax.axvline(b_max,color='k',linestyle='dashed')
-#ax.set_xlabel(r'$b$')
-#ax.set_ylabel(r'$\Delta T_*(b) $')
-#ax.set_title(r'$R = {0}$'.format(R))
-#ax.set_yscale('log')
-#plt.show()
 
 #%%
 
@@ -179,8 +135,6 @@ def generate_LBS(R,psi,beam):
     theta_0_array = np.delete(theta_0_array,indx_nan)
 
     np.savetxt('LBS_out/LBS_R_{0}_psi_{1}_beam_{2}_test'.format(R,psi,beam),np.transpose([theta_0_array,I_obs]))
-    #plt.plot(theta_0_array,I_obs)
-    #plt.show()
 
 #%%
 
@@ -271,31 +225,32 @@ def skewed_Laplace_ppf(q,t0,A,s):
     XminM = lambda q: t0 + log((1 + s**2) * q / s**2) * s / A
     XplusM = lambda q: t0 - log((1 - q) * (1 + s**2)) / s / A
     return np.piecewise(q, [t0 > XminM(q), t0 < XplusM(q)], [XminM(q),XplusM(q)])
-
-#%%
-
-def tmin(y,t0,A,s):
-    return s / A * np.log(y * (1 + s**2) / s) + t0
-
-def tplus(y,t0,A,s):
-    return (- 1) / (A * s) * np.log(y * (1 + s**2)) + t0
         
 #%%
 
-# my model is the skewed Laplace probability density function with normalisation *N* and background *bg*
+# the model is the skewed Laplace probability density function with normalisation *N* and background rate *bg_rate*
 def burst_model_pdf(t,t0,A,s,N,bg_rate):
     return N * skewed_Laplace_pdf(t,t0,A,s) + bg_rate
 
 def burst_model_cdf(t,t0,A,s,N,bg_rate,offset):
     return N * skewed_Laplace_cdf(t,t0,A,s) + bg_rate * t + offset
 
-def Dt_burst(ysig,A,s,N,b,bw):
-    return - (1 + s**2)/(A * s) * log( (s + 1 / s)/(N * A * bw) * (ysig - b))
-
 #def burst_model_ppf(q,t0,A,s,N,bg_rate):
 #    XminM = lambda q: q / bg_rate - (s * sp.special.lambertw((A * np.exp((A * (q - bg_rate * t0)) / (bg_rate * s)) * N * s) / (bg_rate * (1 + s**2)))) / A
 #    XplusM = lambda q: (- N + q) / bg_rate + sp.special.lambertw((A * np.exp((A * s * (N - q + bg_rate * t0)) / bg_rate) * N * s) / (bg_rate * (1 + s**2))) / (A * s)
 #    return np.piecewise(q, [t0 > XminM(q), t0 < XplusM(q)], [XminM(q),XplusM(q)])
+
+def DT_burst(ysig,A,s,N,b,bw):
+    return - (1 + s**2)/(A * s) * log( (s + 1 / s)/(N * A * bw) * (ysig - b))
+
+def C1(s,Dt):
+    return (1 + s**2) / (s * Dt)
+    
+def C2(ysig,s,b,bw):
+    return (s + 1 / s) * (ysig - b) / bw
+
+def Ncounts(ysig,A,s,b,bw,Dt):
+    return C2(ysig,s,b,bw) * exp(A / C1(s,Dt)) / A
     
 #%%
 
@@ -346,201 +301,229 @@ class PoissonPosterior(object):
 neg = True
 
 #%%
-R0 = 1000.0
+
+def reduced_Chi_squared(res,err,dof):
+    return sum((res / err)**2) / dof
+
+#%%
+
+R0 = 2.5
 psi0 = 1
 beam0 = 0
-alpha0 = 90
-chi0 = 90
+alpha0 = 45
+chi0 = 45
+
+P = 6
+t0 = 1.3 * P
+s0 = 1
+bg0 = 3
+
+bw = 1 / 200
+rate0 = bg0 / bw 
+
+sig4 = 0.997
+y0 = poisson.ppf(sig4,bg0)
+
+# burst duration: short: 0, medium: 1, long: 2)
+burst_nr = 2
+
+Dt_list = [15/100,3/2,3]
+
+A0 = C1(s0,Dt_list[burst_nr])
+N0 = ceil(Ncounts(y0,A0,s0,bg0,bw,Dt_list[burst_nr]))
+
+t_max = 3 * P
+N_bins = int(t_max / bw)
 
 phi = np.linspace(0,2 * pi,int(1e5))
 f = interpolate.interp1d(phi,norm_LBS(phi,R0,psi0,beam0,alpha0,chi0))
 f_max = max(f(phi))
 
-P = 6
-t0 = 1.2 * P
-A0 = 1.0747790879610903
-s0 = 1
-burst_counts0 = 5000
-bg0 = 3
-bw = 0.005
-t_max = 3 * P
-rate = bg0 / bw 
-N_bins = int(t_max / bw)
-
-pars = [t0,A0,s0]
-
-tau_rise = s0 / A0
-tau_decay = 1 / (s0 * A0)
-
-t_fac = 5
-t_in = t0 - tau_rise * t_fac / s0
-t_out = t0 + tau_decay * t_fac 
+pars = [t0,A0,s0,N0,rate0]
 
 toa_burst = []
 counter_tot = 0
-while counter_tot < burst_counts0:  
+
+while counter_tot < N0:  
             
-    # draw a time-of-arrival from the skewed Laplace point percent function
-    toa = skewed_Laplace_ppf(np.random.rand(),t0,A0,s0)      
-    phoa = (toa % P) * 2 * pi / P
-            
-    # generate random number (0,1) and the phase occurrence probability
+    toa = skewed_Laplace_ppf(np.random.rand(),*pars[:3])      
+    phoa =  2 * pi * (toa % P) / P 
+
     r = np.random.rand()
     prob = f(phoa) / f_max  
-            
-    #print(r,prob)
-            
-    # if the phase occurrence probability is larger than a random number, keep the toa
+
     if r < prob:          
         toa_burst.append(toa)
             
     counter_tot += 1
     
-toa_bg = np.random.uniform(0,t_max,N_bins * bg0)
+toa_bg = np.random.uniform(0,t_max,int(N_bins * bg0))
 toa_tot = np.sort(np.concatenate((toa_burst,toa_bg),axis=0))
-        
-N_in = len(toa_burst)
 
+N_in = len(toa_burst)
 tot_counts = len(toa_tot)
 
-x_cdf = np.sort(toa_tot)
-y_cdf = np.arange(tot_counts)
+t = np.linspace(0,t_max,int(1e4))
+resultant = f(2 * pi * (t % P) / P) * (burst_model_pdf(t,*pars) - rate0) * bw / f_max + bg0
 
-indx_cdf = np.where( (x_cdf > t_in) & (x_cdf < t_out) )[0]
+def N_in_func(t,dt):
+    func = lambda t: f(2 * pi * (t % P) / P) * (burst_model_pdf(t,*pars) - rate0) * bw / f_max + bg0
+    N_int = (sp.integrate.simps(func(t),t) - dt * bg0) / bw
+    return ceil(N_int)
 
-x_cdf_fit = x_cdf[indx_cdf]
-y_cdf_fit = y_cdf[indx_cdf]
+# toa_tot, t_max, bw, A0, s0, N_in
 
-offset = y_cdf_fit[0] - rate * t_in
+x_edges = np.linspace(0,t_max,int(t_max / bw) + 1,endpoint=True)
+y, x_edges = np.histogram(toa_tot,x_edges)
+x = x_edges[:-1] + x_edges[1] / 2
 
-pars_cdf = pars + [burst_counts0,rate,offset]
-pl_cdf = PoissonPosterior(x_cdf_fit, y_cdf_fit, burst_model_cdf)                 
-res_cdf = fitmethod(pl_cdf, pars_cdf, args=(neg,),method = 'Nelder-Mead')
-popt_cdf = res_cdf.x
-
-x_pdf_edges = np.linspace(0,t_max,int(t_max / bw) + 1,endpoint=True)
-y_pdf, x_pdf_edges = np.histogram(toa_tot,x_pdf_edges)
-x_pdf = x_pdf_edges[:-1] + x_pdf_edges[1] / 2
-
-#from math import factorial as fac
+x_check = x
+y_check = y
 
 ## burst identification algorithm
 
 # running mean window
-N_window = int(P / (2 * bw))
+#NP = [poisson.pmf(y_i,bg0) * len(y) for y_i in y]
+#indx_sig = np.where(np.array(NP) <= 0.01)[0]
 
-mu_lst = []
-NP_lst = []
+# The above significance level is always at 14, so we might as well...
 
-sig2 = 0.95
-y_sig0 = poisson.ppf(sig2,bg0)
- 
-for i in range(N_window,len(y_pdf) - N_window):
-    y_pre_i = y_pdf[:i - N_window]
-    y_post_i = y_pdf[i + N_window:]
+sig_level = 14
+
+threshold = 3.4
+incr_frac = 100
+
+indx_sig = np.where(y >= sig_level)[0]
+
+x_sig = x_check[indx_sig]
+y_sig = y_check[indx_sig]
+
+while len(y_sig) > 0:
     
-    mu_i = np.mean(np.concatenate((y_pre_i,y_post_i), axis=0))  
-    mu_lst.append(mu_i)
+    indx_y_sig_max = np.argmax(y_sig)
     
-    NP_i = poisson.pmf(y_pdf[i],mu_i) * (len(y_pdf) - 2 * N_window)  
-    NP_lst.append(NP_i)
+    t0_sig_max = x_sig[indx_y_sig_max]
     
-sig_indx = np.where(np.array(NP_lst) <= 0.01)[0]
-
-bins_int = x_pdf[N_window:-N_window]
-sig_time = bins_int[sig_indx]
-
-counts_int = y_pdf[N_window:-N_window]
-sig_counts = counts_int[sig_indx]
-
-plt.plot(x_pdf,y_pdf,linestyle='steps-mid',color='k')
-plt.plot(sig_time,sig_counts,'bo')
-plt.axhline(y_sig0)
-plt.xlim(0,t_max)
-
-indx_pdf = np.where( (x_pdf > t_in) & (x_pdf < t_out) )[0]
-
-x_pdf_fit = x_pdf[indx_pdf]
-y_pdf_fit = y_pdf[indx_pdf]
-
-pars_pdf = pars + [burst_counts0,rate]
-pl_pdf = PoissonPosterior(x_pdf_fit, y_pdf_fit / bw, burst_model_pdf)                      
-res_pdf = fitmethod(pl_pdf, pars_pdf, args=(neg,),method = 'Nelder-Mead')
-popt_pdf = res_pdf.x
-
-x = np.linspace(0,t_max,tot_counts)
-
-parent_cdf = burst_model_cdf(x,*pars_cdf)
-bfm_cdf = burst_model_cdf(x_cdf_fit,*popt_cdf)
-
-parent_pdf = burst_model_pdf(x,*pars_pdf)
-bfm_pdf = burst_model_pdf(x_pdf_fit,*popt_pdf)
-bfm_pdf_cdfpar = burst_model_pdf(x_pdf_fit,*popt_cdf[:-1])
-
-print(*pars_pdf)
-
-if res_cdf.success:
-    fit_cdf = 'success'
-else: fit_cdf = 'fail'
-
-if res_pdf.success:
-    fit_pdf = 'success'
-else: fit_pdf = 'fail'
+    Dt_interval = 1
     
-cSG = 'SlateGrey' 
+    interval_p = np.array(np.where((x_check >= t0_sig_max) & (x_check <= t0_sig_max + Dt_interval))[0])
+    interval_m = np.array(np.where((x_check <= t0_sig_max) & (x_check >= t0_sig_max - Dt_interval))[0])
+        
+    interval_p_mean = np.mean(y_check[interval_p])
+    interval_m_mean = np.mean(y_check[interval_m])
+    
+    incr_p = 1
+    while interval_p_mean > threshold:
+        interval_p = np.array(np.where((x_check >= t0_sig_max + incr_p / incr_frac) & (x_check <= t0_sig_max + Dt_interval + incr_p / incr_frac))[0])
+        interval_p_mean = np.mean(y_check[interval_p])
+        incr_p += 1
+    if len(interval_p) < 1:
+        indx_t_out = -1
+    else:
+        indx_t_out = interval_p[-1]    
+    t_out = x_check[indx_t_out]
 
-fig, (ax1, ax2) = plt.subplots(2,1, figsize=(6,8), sharex = True)
+    incr_m = 1
+    while interval_m_mean > threshold:
+        interval_m = np.array(np.where((x_check <= t0_sig_max - incr_m / incr_frac) & (x_check >= t0_sig_max - Dt_interval - incr_m / incr_frac))[0])
+        interval_m_mean = np.mean(y_check[interval_m])
+        incr_m += 1
+    if len(interval_m) < 1:
+        indx_t_in = 0
+    else:
+        indx_t_in = interval_m[0]
+    t_in = x_check[indx_t_in]
+    
+    indx_pdf = np.where((x_check > t_in) & (x_check < t_out))[0]
 
-x_lowl = t_in - P
-x_upl = t_out + P
+    x_fit = x_check[indx_pdf]
+    y_fit = y_check[indx_pdf]
+    
+    t_int = np.linspace(t_in,t_out,int(1e4))
+    dt_int = t_out - t_in
+    
+    N_in_calc = N_in_func(t_int,dt_int)
+   
+    initial_pars = [t0_sig_max,A0,s0,N_in_calc]
 
-y_lowl =  burst_model_cdf(x_lowl,*pars_cdf) / tot_counts
-y_upl = burst_model_cdf(x_upl,*pars_cdf) / tot_counts
+    pl = PoissonPosterior(x_fit, y_fit / bw, lambda t,t0,A,s,N: burst_model_pdf(t,t0,A,s,N,rate0))                      
+    res = fitmethod(pl, initial_pars, args=(neg,),method = 'Nelder-Mead')
+    popt = res.x  
+    
+    
+    
+    x_m = np.linspace(0,t_max,int(1e4))
+    
+    parent = burst_model_pdf(x_m,*pars) * bw
+    bfm = burst_model_pdf(x_fit,*popt,rate0) * bw
 
-ax1.axvline(t0,linestyle='--',color='k')
-ax1.plot(x_cdf,y_cdf / tot_counts,linestyle='steps-mid',label='data',color='k')
-ax1.plot(x,parent_cdf / tot_counts,label='parent',color=cSG,lw=2,linestyle='--')
-ax1.plot(x_cdf_fit,bfm_cdf / tot_counts,label='bfm cdf',color='Crimson')
-ax1.legend(loc=4, prop={'size': 10})
-ax1.set_xlim(x_lowl,x_upl)
-ax1.set_ylim(y_lowl,y_upl)
-ax1.set_title(r'$\rm{{Normalized\ cumulative\ burst\ profile,\ fit: {0}}}$'.format(fit_cdf))
-ax1.grid(True,alpha=0.5)
+    plt.plot(x,y,linestyle='steps-mid',color=cSB)
+    plt.plot(x_check,y_check,linestyle='steps-mid',color='k')
+    plt.plot(x_sig,y_sig,'o',color='magenta')
 
-ax2.axvline(t0,linestyle='--',color='k')
-ax2.plot(x_pdf,y_pdf,linestyle='steps-mid',label='data',color='k')
-ax2.plot(x,parent_pdf * bw,label='parent',color=cSG,lw=2,linestyle='--')
-ax2.plot(x_pdf_fit,bfm_pdf * bw,label='bfm pdf',color=cSB)
-#ax2.plot(x_pdf_fit,bfm_pdf_cdfpar * bw,label='bfm cdf',color='Crimson')
-ax2.legend(loc=1,prop={'size': 10})
-ax2.set_xlim(x_lowl,x_upl)
-ax2.set_title(r'$\rm{{Burst\ profile,\ fit: {0}}}$'.format(fit_pdf))
-ax2.grid(True,alpha=0.5)
-plt.show()
+    plt.plot(x_m,parent,color='DimGrey')
+    plt.plot(x_fit,bfm,color='Orange')
+    
+    plt.xlim(t_in,t_out)
+    plt.ylim(0,7/6 * max(y_sig))
+    
+    plt.axhline(sig_level,linestyle='dashed',color='magenta')
+    plt.plot(t,resultant,'r')
+    
+    plt.show()
+    
+    indx_tot = np.arange(len(x_check)).tolist()
+    indx_inverse_interval = indx_tot[:indx_t_in] + indx_tot[indx_t_out:]
+    
+    x_check = x_check[indx_inverse_interval]
+    y_check = y_check[indx_inverse_interval]
+    
+    indx_sig = np.where(y_check >= sig_level)[0]
 
+    x_sig = x_check[indx_sig]
+    y_sig = y_check[indx_sig]
+
+    plt.plot(x,y,linestyle='steps-mid',color=cSB)
+    plt.plot(x_check,y_check,linestyle='steps-mid',color='k')
+    
+    plt.plot(x_m,parent,color='DimGrey')
+    
+    plt.axvline(t_in,linestyle='dotted',color='r')
+    plt.axvline(t_out,linestyle='dotted',color='r')
+    plt.axhline(sig_level,linestyle='dashed',color='magenta')
+    plt.plot(t,resultant,'r')
+    plt.xlim(0,t_max)
+    
+    plt.show()
+     
 #%%
 
 if not os.path.isdir('RUN1_out'):
        os.makedirs('RUN1_out')
 
-def RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg):
+def RUN1(R,psi,beam,alpha,chi,P,DT,N_bursts,s,bg):
+    
+    Ch2_list = []
+    
+    sig_level = 14
+    threshold = 3.5
+    incr_frac = 100
     
     # generate the appropriate LBS
     phi = np.linspace(0,2 * pi,int(1e5))
     f = interpolate.interp1d(phi,norm_LBS(phi,R,psi,beam,alpha,chi))
-    f_max = max(f(phi))
-        
+    f_max = max(f(phi))    
+    
     sig_burst = 0
     
     # define lightcurve properties
     bw = 0.005
     t_max = 3 * P
-    N_bins = int(t_max / bw)
+    Nbins = int(t_max / bw)
     rate = bg / bw
     
-    sig2 = 0.95
-    y_sig = poisson.ppf(sig2,bg)
-    burst_duration = Dt_burst(y_sig,A,s,burst_counts,bg,bw)
+    A = C1(s,DT)
+    N = int(ceil(Ncounts(sig_level,A,s,bg,bw,DT)))
 
     output_pars = []
     tot_phoa = []
@@ -562,7 +545,7 @@ def RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg):
         
         # accept-reject method for burst counts
         counter_tot = 0
-        while counter_tot < burst_counts:  
+        while counter_tot < N:  
             
             # draw a time-of-arrival from the skewed Laplace point percent function
             toa = skewed_Laplace_ppf(np.random.rand(),t0,A,s)      
@@ -570,9 +553,7 @@ def RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg):
             
             # generate random number (0,1) and the phase occurrence probability
             r = np.random.rand()
-            prob = f(phoa) / f_max  
-            
-            #print(r,prob)
+            prob = f(phoa) / f_max
             
             # if the phase occurrence probability is larger than a random number, keep the toa
             if r < prob:          
@@ -585,160 +566,218 @@ def RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg):
         if N_in == 0:
             continue
         
-        ### ???? ###
-        ## Fit burst profile (if burst is significant) ##
-        # We calculate the duration of a burst with the same input parameters, but now
-        # consisting only of N_in counts. If this burst is above the 2sigma level, i.e.
-        # if its 2sigma duration Dt_sig is positive (Dt_sig > 0) we label the burst as 
-        # significant and proceed to fit the burst.
+        pars = [t0,A,s,N,rate]
         
-        # This is however quite an arbitrary way to determine the significance of the 
-        # burst since the values for 't0', 'a', and 's' may be different.
+        t = np.linspace(0,t_max,int(1e4))
+        resultant = f(2 * pi * (t % P) / P) * (burst_model_pdf(t,*pars) - rate) * bw / f_max + bg
+
+        def N_in_func(t,dt):
+            func = lambda t: f(2 * pi * (t % P) / P) * (burst_model_pdf(t,*pars) - rate0) * bw / f_max + bg0
+            N_int = (sp.integrate.simps(func(t),t) - dt * bg) / bw
+            return ceil(N_int)
         
-        Dt_sig = Dt_burst(y_sig,A,s,N_in,bg,bw)
-       
-        if Dt_sig > 0:
-            
-            ### ???? ###
-            # As initial fit parameters I use the parameters of the input burst.
-            # However this might bias the result of the fit!
-            
-            # define fit parameters
-            pars = [t0,A,s,N_in,rate]
-#            parent_pars = [t0,A,s,burst_counts,rate]
-            
-            # combine the burst counts with the backgrount counts
-            toa_bg = np.random.uniform(0,t_max,N_bins * bg)
-            toa_tot = np.concatenate((toa_burst,toa_bg),axis=0)
-            #tot_counts = len(toa_tot)
-            
-            #x_cdf = np.sort(toa_tot)
-            #y_cdf = np.arange(tot_counts)
-            
-            x_pdf_edges = np.linspace(0,t_max,N_bins + 1,endpoint=True)
-            y_pdf, x_pdf_edges = np.histogram(toa_tot,x_pdf_edges)
-            
-#            fit_indx_cdf = np.where( (x_cdf > t_in) & (x_cdf < t_out) )[0]
-#            x_cdf_fit = x_cdf[fit_indx_cdf]
-#            y_cdf_fit = y_cdf[fit_indx_cdf]
-            
-            # account for the offset at t_in
-#            offset = y_cdf_fit[0] - rate * t_in
-            
-            x_pdf = x_pdf_edges[:-1] + x_pdf_edges[1] / 2
-            y_pdf = y_pdf / bw
+        toa_bg = np.random.uniform(0,t_max,Nbins * bg)
+        toa_tot = np.concatenate((toa_burst,toa_bg),axis=0)
+        
+        x_edges = np.linspace(0,t_max,int(t_max / bw) + 1,endpoint=True)
+        y, x_edges = np.histogram(toa_tot,x_edges)
+        x = x_edges[:-1] + x_edges[1] / 2
 
-            fit_indx_pdf = np.where( (x_pdf > t_in) & (x_pdf < t_out) )[0]
-            x_pdf_fit = x_pdf[fit_indx_pdf]
-            y_pdf_fit = y_pdf[fit_indx_pdf]
-            
-#            pl_cdf = PoissonPosterior(x_cdf_fit, y_cdf_fit, burst_model_cdf) 
-            pl_pdf = PoissonPosterior(x_pdf_fit, y_pdf_fit, burst_model_pdf)
-                                      
-            #pars_cdf = pars + [offset]
-#            parent_pars_cdf = parent_pars + [offset]
-            
-            #res_cdf = fitmethod(pl_cdf, pars_cdf, args=(neg,),method = 'Nelder-Mead')
-#            if res_cdf.success:
-#                fit_cdf = 'success'
-#            else: fit_cdf = 'fail'
-            
-            res_pdf = fitmethod(pl_pdf, pars, args=(neg,),method = 'Nelder-Mead')
-#            if res_pdf.success:
-#                fit_pdf = 'success'
-#            else: fit_pdf = 'fail'          
-            
-            ### ???? ###
-            # Here we determine the best-fit parameters. However, it would be good
-            # if we could determine their confidence intervals as well! The spread
-            # in the final distributions may mainly be due to the fact that it will
-            # become more difficult to obtain a good fit if the burst consists of 
-            # less counts.
+        x_check = x
+        y_check = y
 
-#            popt_cdf = res_cdf.x
-            popt_pdf = res_pdf.x
+        ## burst identification algorithm
+
+        indx_sig = np.where(y >= sig_level)[0]
+
+        x_sig = x_check[indx_sig]
+        y_sig = y_check[indx_sig]
+        
+        while len(y_sig) > 0:
             
-            t0_bfpar, A_bfpar, s_bfpar = popt_pdf[0:3]
-            Dt0_pdf = popt_pdf[0] - t0
+            indx_y_sig_max = np.argmax(y_sig)
+    
+            t0_sig_max = x_sig[indx_y_sig_max]
+    
+            Dt_interval = 1
+
+            interval_p = np.array(np.where((x_check >= t0_sig_max) & (x_check <= t0_sig_max + Dt_interval))[0])
+            interval_m = np.array(np.where((x_check <= t0_sig_max) & (x_check >= t0_sig_max - Dt_interval))[0])
+        
+            interval_p_mean = np.mean(y_check[interval_p])
+            interval_m_mean = np.mean(y_check[interval_m])
+    
+            incr_p = 1
+            while interval_p_mean > threshold:
+                interval_p = np.array(np.where((x_check >= t0_sig_max + incr_p / incr_frac) & (x_check <= t0_sig_max + Dt_interval + incr_p / incr_frac))[0])
+                interval_p_mean = np.mean(y_check[interval_p])
+                incr_p += 1
+            if len(interval_p) < 1:
+                indx_t_out = -1
+            else:
+                indx_t_out = interval_p[-1]   
+            t_out = x_check[indx_t_out]
+
+            incr_m = 1
+            while interval_m_mean > threshold:
+                interval_m = np.array(np.where((x_check <= t0_sig_max - incr_m / incr_frac) & (x_check >= t0_sig_max - Dt_interval - incr_m / incr_frac))[0])
+                interval_m_mean = np.mean(y_check[interval_m])
+                incr_m += 1
+            if len(interval_m) < 1:
+                indx_t_in = 0
+            else:
+                indx_t_in = interval_m[0]
+            t_in = x_check[indx_t_in]
+    
+            indx_pdf = np.where((x_check > t_in) & (x_check < t_out))[0]
+
+            x_fit = x_check[indx_pdf]
+            y_fit = y_check[indx_pdf]
+            
+            t_int = np.linspace(t_in,t_out,int(1e4))
+            dt_int = t_out - t_in
+    
+            N_in_calc = N_in_func(t_int,dt_int)
+
+            ### initial guess 'A' still depends on input data ###
+
+            initial_pars =  [t0_sig_max,A,s,N_in_calc]
+            
+            pl = PoissonPosterior(x_fit, y_fit / bw, lambda t,t0,A,s,N: burst_model_pdf(t,t0,A,s,N,rate0))                      
+            res = fitmethod(pl, initial_pars, args=(neg,),method = 'Nelder-Mead')
+            popt = res.x   
+            
+            y_fit_is0_indx = np.where(y_fit == 0)[0]
+            y_fitn0 = np.delete(y_fit,y_fit_is0_indx)
+            x_fitn0 = np.delete(x_fit,y_fit_is0_indx)
+    
+            residuals = np.array(abs(y_fitn0 - burst_model_pdf(x_fitn0,*popt,rate0) * bw))
+            errors = np.array(sqrt(y_fitn0))
+            dof = len(y_fitn0) - len(popt)
+
+            sum_i = (residuals/errors)**2
+            
+            sum_i[np.isinf(sum_i)] = 0
+            rCh2 = sum(sum_i) / dof
+            
+#            x_m = np.linspace(0,t_max,int(1e4))
+#    
+#            parent = burst_model_pdf(x_m,*pars) * bw
+#            bfm = burst_model_pdf(x_fit,*popt,rate0) * bw
+#
+#            plt.plot(x,y,linestyle='steps-mid',color=cSB)
+#            plt.plot(x_check,y_check,linestyle='steps-mid',color='k')
+#            plt.plot(x_sig,y_sig,'o',color='magenta')
+#
+#            plt.plot(x_m,parent,color='SlateGrey')
+#            plt.plot(x_fit,bfm,color='Orange')
+#            plt.plot(t,resultant,'r')
+#    
+#            plt.xlim(t_in,t_out)
+#    
+#            plt.axhline(sig_level,linestyle='dashed',color='magenta')
+#    
+#            plt.show()
+    
+            indx_tot = np.arange(len(x_check)).tolist()
+            indx_inverse_interval = indx_tot[:indx_t_in] + indx_tot[indx_t_out:]
+    
+            x_check = x_check[indx_inverse_interval]
+            y_check = y_check[indx_inverse_interval]
+    
+            indx_sig = np.where(y_check >= sig_level)[0]
+
+            x_sig = x_check[indx_sig]
+            y_sig = y_check[indx_sig]
+
+#            plt.plot(x,y,linestyle='steps-mid',color=cSB)
+#            plt.plot(x_check,y_check,linestyle='steps-mid',color='k')
+#            plt.plot(t,resultant,'r')
+#            
+#            plt.xlim(0,t_max)
+#    
+#            plt.axvline(t_in,linestyle='dotted',color='r')
+#            plt.axvline(t_out,linestyle='dotted',color='r')
+#            plt.axhline(sig_level,linestyle='dashed',color='magenta')
+#    
+#            plt.show()
+
+            if (rCh2 > 1.5 and rCh2 < 0.67):
+                Ch2_list.append([i,rCh2])
+                print("Burst fit number {} might be crap!".format(i+1))
+                continue
+            
+            t0_bfpar, A_bfpar, s_bfpar, N_bfpar = popt
+            Dt0 = popt[0] - t0
             
             ph0 = (t0 - P) / P
             ph0_bfpar = (t0_bfpar - P) / P
-
-            output_pars.append([N_in,t0,t0_bfpar,Dt0_pdf,A_bfpar,s_bfpar,ph0,ph0_bfpar])
+            
+            output_pars_i = [N_in,t0,t0_bfpar,Dt0,A_bfpar,s_bfpar,N_bfpar,ph0,ph0_bfpar]
+            
+            output_pars.append(output_pars_i)
             
             sig_burst += 1
             
-            # here we can choose to plot every single burst: not recommended for large burst storms
-
-#            xm = np.linspace(0,t_max,10 * N_bins + 1,endpoint=True)
-#            #fig, (ax1, ax2) = plt.subplots(2,1,figsize=(6,10),sharex=True)
-#            fig, ax2 = plt.subplots(1,figsize=(6,10),sharex=True)
-            
-#            ax1.axvline((t0-P)/P,linestyle='--',color='k')
-#            
-#            ax1.plot((x_cdf - P) / P,y_cdf / tot_counts,linestyle='steps-mid',label='data',color='k')
-#            ax1.plot((xm - P) / P,burst_model_cdf(xm,*parent_pars_cdf) / tot_counts,label='parent',color=cSG,lw=2,linestyle='--')
-#            ax1.plot((x_cdf_fit - P) / P,burst_model_cdf(x_cdf_fit,*popt_cdf) / tot_counts,label='bfm cdf',color='Crimson')   
-#            ax1.set_title(r'$\rm{{Burst}} = {0}, fit.cdf:{1}, fit.pdf:{2}$'.format(sig_burst,fit_cdf,fit_pdf))
-#            ax1.set_xlim(t_in,t_out)
-#            ax1.set_ylim(t_in * rate / tot_counts,t_out * rate / tot_counts)
-#            ax1.legend(loc=4, prop={'size': 10})
-#
-#            ax2.plot((x_pdf-P)/P,y_pdf,linestyle='steps-mid',label='data',color='k')
-#            ax2.plot((xm-P)/P,burst_model_pdf(xm,*parent_pars),label='parent',color=cSG,lw=2,linestyle='--')
-#            ax2.plot((x_pdf_fit-P)/P,burst_model_pdf(x_pdf_fit,*popt_pdf),label='bfm pdf',color=cSB)
-#            #ax2.plot((x_cdf_fit-P)/P,burst_model_pdf(x_cdf_fit,*popt_cdf[:-1]),label='bfm cdf',color='Crimson')
-#
-#            ax2.set_xlim((t_in-P)/P-0.1,(t_out-P)/P+0.1)
-#            ax2.legend(loc=1, prop={'size': 10})
-#            ax2.set_xlabel(r'$\phi/2\pi$')
-#            
-#            plt.subplots_adjust(hspace=0.1)
-#            
-#            plt.figure()
-        else: continue
-            
         phoa_tot_i = [(toa_i % P) * 2 * pi / P for toa_i in toa_tot]
         tot_phoa += phoa_tot_i 
+        
+        bursts_done = i / (N_bursts - 1)
+        print("\rProgress: [{0:50s}] {1:.1f}%".format('#' * int(bursts_done * 50), bursts_done * 100), end="", flush=True)
     
     # define the significant burst ratio
     q = sig_burst / N_bursts
     
-    print('input burst duration (Dt) = {:.2} seconds'.format(burst_duration))
-    print('fraction of significant bursts to total bursts = {:.2}'.format(q))
+    #print('input burst duration (Dt) = {:.2} seconds'.format(burst_duration))
+    print('\nfraction of significant bursts to total bursts = {:.2}'.format(q))
 
     plot_data = np.transpose(output_pars)
-
-    A_Nbins = 100
-    A_bin_edges = np.linspace(0,A+1,A_Nbins + 1, endpoint=True)
-    A_counts_pdf, A_bins = np.histogram(plot_data[4],A_bin_edges)
-    A_bins = A_bins[:-1] + A_bins[1] / 2
     
-    s_Nbins = 100
-    s_bin_edges = np.linspace(0,4,s_Nbins + 1, endpoint=True)
-    s_counts_pdf, s_bins = np.histogram(plot_data[5],s_bin_edges)
-    s_bins = s_bins[:-1] + s_bins[1] / 2
-
-    Dt0_Nbins = 100
+    Dt0_data = plot_data[3]
+    Dt0_Nbins = 200
     Dt0_bin_edges = np.linspace(-1,1,Dt0_Nbins + 1, endpoint=True)
-    Dt0_counts_pdf, Dt0_bins = np.histogram(plot_data[3],Dt0_bin_edges)
+    Dt0_counts, Dt0_bins = np.histogram(Dt0_data,Dt0_bin_edges)
     Dt0_bins = Dt0_bins[:-1] + abs(Dt0_bins[1] - Dt0_bins[0]) / 2
     
-    ph0_bfpar_pdf = [(t0_bfpar_i % P) / P for t0_bfpar_i in plot_data[2]] 
+    A_data = plot_data[4]
+    A_Nbins = 100
+    A_bin_edges = np.linspace(0.5 * A,1.5 * A,A_Nbins + 1, endpoint=True)
+    A_counts, A_bins = np.histogram(A_data,A_bin_edges)
+    A_bins = A_bins[:-1] + A_bins[1] / 2
     
-    ph0_Nbins = 20
-    ph0_bin_edges = np.linspace(0,1,ph0_Nbins + 1, endpoint=True)
+    s_data = plot_data[5]
+    s_Nbins = 100
+    s_bin_edges = np.linspace(0,4,s_Nbins + 1, endpoint=True)
+    s_counts, s_bins = np.histogram(s_data,s_bin_edges)
+    s_bins = s_bins[:-1] + s_bins[1] / 2
     
-#    ph0_counts_cdf, ph0_bins = np.histogram(ph0_bfpar_cdf,ph0_bin_edges)
-    ph0_counts_pdf, ph0_bins = np.histogram(ph0_bfpar_pdf,ph0_bin_edges)
+    N_data = plot_data[6]
+#    N_Nbins = 100
+#    N_bin_edges = np.logspace(3,np.log10(N),N_Nbins + 1, endpoint=True)
+#    N_counts, N_bins = np.histogram(plot_data[6],N_bin_edges)
+#    N_bins = N_bins[:-1] + N_bins[1] / 2
+
+#    DT_burst(ysig,A,s,N,b,bw)
     
-    ph0_bw = ph0_bins[1]
+    DT_data = DT_burst(9,A_data,s_data,N_data,bg,bw)
+    DT_data[np.isinf(DT_data)] = 0
+    DT_data[np.isnan(DT_data)] = 0
+    DT_Nbins = 100
+    DT_bin_edges = np.linspace(0,P,DT_Nbins + 1, endpoint=True)
+    DT_counts, DT_bins = np.histogram(DT_data,DT_bin_edges)
+    DT_bins = DT_bins[:-1] + DT_bins[1] / 2
+
+    plt.plot(Dt0_bins,Dt0_counts,linestyle='steps-mid',color=cSB)
+    plt.axvline(0,color='k',linestyle='--')
+    plt.xlim(-0.15,0.15)
+    plt.xlabel(r'$\Delta t_0\ [\rm{seconds}]$')
+    plt.ylabel(r'$dN/d(\Delta t_0)$')
+    plt.title(r'$\rm{Peak\ time\ offset\ distribution}$')
+    plt.grid(True,alpha=0.5)
+    plt.show()
     
-    # plot the best-fit skewness parameter distribution
-#    plt.plot(s_bins,s_counts_cdf,linestyle='steps-mid',color='Crimson')
-    plt.plot(A_bins,A_counts_pdf,linestyle='steps-mid',color=cSB)
-    plt.axvline(A,color='k',linestyle='--',label=r'$s_0$')
-#    plt.xlim(0,s + 1)
+    plt.plot(A_bins,A_counts,linestyle='steps-mid',color=cSB)
+    plt.axvline(A,color='k',linestyle='--',label=r'$A_0$')
     plt.xlabel(r'$A$')
     plt.ylabel(r'$dN/dA$')
     plt.title(r'$\rm{Amplitude\ parameter\ distribution}$')
@@ -746,9 +785,7 @@ def RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg):
     plt.grid(True,alpha=0.5)
     plt.show()
 
-    # plot the best-fit skewness parameter distribution
-#    plt.plot(s_bins,s_counts_cdf,linestyle='steps-mid',color='Crimson')
-    plt.plot(s_bins,s_counts_pdf,linestyle='steps-mid',color=cSB)
+    plt.plot(s_bins,s_counts,linestyle='steps-mid',color=cSB)
     plt.axvline(s,color='k',linestyle='--',label=r'$s_0$')
     plt.xlim(0,s + 1)
     plt.xlabel(r'$s$')
@@ -758,14 +795,22 @@ def RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg):
     plt.grid(True,alpha=0.5)
     plt.show()
     
-    # plot the difference with input and best-fit t_0 distribution
-#    plt.plot(Dt0_bins,Dt0_counts_cdf,linestyle='steps-mid',color='Crimson')
-    plt.plot(Dt0_bins,Dt0_counts_pdf,linestyle='steps-mid',color=cSB)
-    plt.axvline(0,color='k',linestyle='--')
-    plt.xlim(-0.15,0.15)
-    plt.xlabel(r'$\Delta t_0\ [\rm{seconds}]$')
-    plt.ylabel(r'$dN/d(\Delta t_0)$')
-    plt.title(r'$\rm{Peak\ time\ offset\ distribution}$')
+#    plt.plot(N_bins,N_counts,linestyle='steps-mid',color=cSB)
+#    plt.xscale('log')
+#    plt.yscale('log')
+#    plt.xlabel(r'$Fluence$')
+#    plt.ylabel(r'$dF/dN$')
+#    plt.title(r'$\rm{Fluence\ parameter\ (N)\ distribution}$')
+#    plt.grid(True,alpha=0.5)
+#    plt.show()
+
+    plt.plot(DT_bins,DT_counts,linestyle='steps-mid',color=cSB)
+    plt.axvline(DT,color='k',linestyle='--',label=r'$\Delta T_0$')
+    plt.xlim(0,P)
+    plt.xlabel(r'$\Delta T$')
+    plt.ylabel(r'$dN/d(\Delta T)$')
+    plt.title(r'$\rm{Burst\ duration\ distribution}$')
+    plt.legend()
     plt.grid(True,alpha=0.5)
     plt.show()
 
@@ -778,6 +823,12 @@ def RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg):
     ph_bins = (ph_bins[:-1] + ph_bw / 2)/(2 * pi)
     ph_counts = ph_counts / ph_bw / len(tot_phoa)
     ph_counts_err = ph_counts_err / ph_bw / len(tot_phoa)
+    
+    ph0_bfpar = [(t0_bfpar_i % P) / P for t0_bfpar_i in plot_data[2]]     
+    ph0_Nbins = 20
+    ph0_bin_edges = np.linspace(0,1,ph0_Nbins + 1, endpoint=True)    
+    ph0_counts, ph0_bins = np.histogram(ph0_bfpar,ph0_bin_edges)
+    ph0_bw = ph0_bins[1]
 
     fig, (ax1, ax2, ax3) = plt.subplots(3, sharex=True, figsize=(6,8))
     
@@ -790,46 +841,28 @@ def RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg):
     # plot: count density vs phase (only contains the counts of the cycles containing significant bursts)
     ax2.errorbar(ph_bins,ph_counts,yerr = ph_counts_err,color='k',linestyle='steps-mid')
     ax2.set_ylabel(r'$\rm{Count\ density}$')
-    ax2.set_title(r'$\rm{{Counts\ per\ burst = {0},\ \ Background\ counts\ per\ cycle = {1}}}$'.format(burst_counts,int(N_bins/3)))
+    ax2.set_title(r'$\rm{{Counts\ per\ burst = {0},\ \ Background\ counts\ per\ cycle = {1}}}$'.format(N,int(Nbins/3)))
     ax2.grid(True,alpha=0.5)
     
     # plot: best-fit phi occurrence vs phase
 #    ax3.plot((ph0_bins[:-1] + ph0_bw / 2),ph0_counts_cdf,color='Crimson',linestyle='steps-mid')
-    ax3.plot((ph0_bins[:-1] + ph0_bw / 2),ph0_counts_pdf,color=cSB,linestyle='steps-mid')
+    ax3.plot((ph0_bins[:-1] + ph0_bw / 2),ph0_counts,color=cSB,linestyle='steps-mid')
     ax3.set_xlabel(r'$\phi/2\pi$')
     ax3.set_ylabel(r'$\phi_0\ \rm{distribution}$')
-    ax3.set_title(r'$N_{{\rm{{bursts}}}}^{{\rm{{tot}}}}={0},\ N_{{\rm{{bursts}}}}^{{\rm{{sig}}}}={1},\ q = {2:.2}$'.format(N_bursts,len(ph0_bfpar_pdf),q))
+    ax3.set_title(r'$N_{{\rm{{bursts}}}}^{{\rm{{tot}}}}={0},\ N_{{\rm{{bursts}}}}^{{\rm{{sig}}}}={1},\ q = {2:.2}$'.format(N_bursts,len(ph0_bfpar),q))
     ax3.grid(True,alpha=0.5)
     
     plt.subplots_adjust(hspace=0.2)
-    plt.show()    
+    plt.show()
+
+    np.savetxt('RUN1_out/test/chi',Ch2_list)    
     
     ## OUTPUT THE SIMULATED DATA
-    np.savetxt('RUN1_out/pars_{0}_{1}_{2}_{3}_{4}_{5:.1f}_{6}_{7}_{8}'.format(R,alpha,chi,P,N_bursts,A,s,burst_counts,bg),output_pars)
-    np.savetxt('RUN1_out/hist_s_{0}_{1}_{2}_{3}_{4}_{5:.1f}_{6}_{7}_{8}'.format(R,alpha,chi,P,N_bursts,A,s,burst_counts,bg),np.transpose([s_bins,s_counts_pdf]))
-    np.savetxt('RUN1_out/hist_Dt0_{0}_{1}_{2}_{3}_{4}_{5:.1f}_{6}_{7}_{8}'.format(R,alpha,chi,P,N_bursts,A,s,burst_counts,bg),np.transpose([Dt0_bins,Dt0_counts_pdf]))  
-    np.savetxt('RUN1_out/hist_ph0_{0}_{1}_{2}_{3}_{4}_{5:.1f}_{6}_{7}_{8}'.format(R,alpha,chi,P,N_bursts,A,s,burst_counts,bg),np.transpose([ph_bins,ph_counts,ph_counts_err]))
-
-#%%
-from time import strftime, localtime
-time_in = strftime('%H:%M:%S', localtime())
-
-R = 1000.0
-psi = 1
-beam = 0
-alpha = 90
-chi = 90
-P = 6
-N_bursts = 500
-A = 0.5
-s = 1
-burst_counts = 8000
-bg = 3
-
-RUN1(R,psi,beam,alpha,chi,P,N_bursts,A,s,burst_counts,bg)
-
-print(time_in)
-print(strftime('%H:%M:%S', localtime()))
+#    np.savetxt('RUN1_out/test/pars_{0}_{1}_{2}_{3}_{4}_{5:.1f}_{6}_{7}_{8}_{9}'.format(R,psi,beam,alpha,chi,P,DT,N_bursts,s,bg),output_pars)
+#    np.savetxt('RUN1_out/test/hist_s_{0}_{1}_{2}_{3}_{4}_{5:.1f}_{6}_{7}_{8}_{9}'.format(R,psi,beam,alpha,chi,P,DT,N_bursts,s,bg),np.transpose([s_bins,s_counts]))
+#    np.savetxt('RUN1_out/test/hist_Dt0_{0}_{1}_{2}_{3}_{4}_{5:.1f}_{6}_{7}_{8}_{9}'.format(R,psi,beam,alpha,chi,P,DT,N_bursts,s,bg),np.transpose([Dt0_bins,Dt0_counts]))  
+#    np.savetxt('RUN1_out/test/hist_ph0_{0}_{1}_{2}_{3}_{4}_{5:.1f}_{6}_{7}_{8}_{9}'.format(R,psi,beam,alpha,chi,P,DT,N_bursts,s,bg),np.transpose([ph_bins,ph_counts,ph_counts_err]))
+    
 
 #%%
 from time import strftime, localtime
@@ -838,21 +871,56 @@ time_in = strftime('%H:%M:%S', localtime())
 R = 2.5
 psi = 1
 beam = 0
+alpha = 90
+chi = 90
 P = 6
-N_bursts = 10000
+
+DT = Dt_list[2]
+N_bursts = 1000
+
 s = 1
 bg = 3
 
-A_l = [0.5373895439805452,1.0747790879610903,10.747790879610903]
-burst_counts_l = [10000,5000,500]
-
-
-alpha_l = [90,45]
-chi_l = [90,45]
-
-for i in range(3):
-    for j in range(2):
-        RUN1(R,psi,beam,alpha_l[j],chi_l[j],P,N_bursts,A_l[i],s,burst_counts_l[i],bg)
+RUN1(R,psi,beam,alpha,chi,P,DT,N_bursts,s,bg)
 
 print(time_in)
 print(strftime('%H:%M:%S', localtime()))
+
+#%%
+
+data = np.loadtxt('RUN1_out/test/chi')
+
+bins = np.linspace(0,2,100)
+counts, bins = np.histogram(data,bins)
+plt.plot(bins[:-1],counts)
+plt.xlim(0,2)
+
+#%%
+
+
+length = len(data)
+ch_sort = sorted(np.transpose(data)[1])
+
+
+
+#%%
+#from time import strftime, localtime
+#time_in = strftime('%H:%M:%S', localtime())
+#
+#R = 2.5
+#psi = 1
+#beam = 0
+#P = 6
+#N_bursts = 10000
+#s = 1
+#bg = 3
+#
+#alpha_l = [90,45]
+#chi_l = [90,45]
+#
+#for i in range(3):
+#    for j in range(2):
+#        RUN1(R,psi,beam,alpha_l[j],chi_l[j],P,N_bursts,A_l[i],s,burst_counts_l[i],bg)
+#
+#print(time_in)
+#print(strftime('%H:%M:%S', localtime()))
