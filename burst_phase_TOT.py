@@ -1,8 +1,14 @@
+### MAGNETAR BURST PHASE DEPENDENCE ###
+
+#%% set working directory
+
 import os
 
-os.chdir('/Users/DexterIII/Documents/Werk/PhD/research/projects/burst_phase/work_folder')
+work_dir = "/Users/DexterIII/Documents/Werk/PhD/research/projects/burst_phase/work_folder"
 
-#%%
+os.chdir(work_dir)
+
+#%% import relevant packages
 
 import numpy as np
 import scipy as sp
@@ -15,18 +21,18 @@ from numpy import pi,radians,arcsin,cos,sin,sqrt,arccos,exp,log
 from math import ceil
 from scipy import integrate, interpolate
 from scipy.stats import poisson
+
+#%% define A(r), i.e. Schwarzschild correction factor
     
 def A(r):
     return 1 - 1 / r
 
-cSB = 'SteelBlue'
-    
-#%%
+#%% theta_star(b) for  0 <= b < b_max
 
-if not os.path.isdir('theta_star_inf_out'):
-       os.makedirs('theta_star_inf_out')
+if not os.path.isdir("theta_star_inf_out"):
+       os.makedirs("theta_star_inf_out")
 
-def theta_star_inf(R,N_u,N_b):
+def theta_star_inf(R = 2.5,N_u = 1e5,N_b = 1e5):
     
     b_max = R * A(R)**(-1/2)
     
@@ -45,11 +51,11 @@ def theta_star_inf(R,N_u,N_b):
     logN_u = int(np.log10(N_u))
     logN_b = int(np.log10(N_b))
     
-    np.savetxt('theta_star_inf_out/theta_star_inf_R_{0}_Nu_{1}_Nb_{2}'.format(R,logN_u,logN_b),theta_star_data,delimiter=' ')
+    np.savetxt("theta_star_inf_out/theta_star_inf_R_{0}_Nu_{1}_Nb_{2}".format(R,logN_u,logN_b),theta_star_data,delimiter=" ")
 
 #%%
 
-#theta_star_inf(2.5,1e5,1e5)
+#theta_star_inf()
 
 #%%
 
@@ -59,23 +65,25 @@ N_b = 1e5
 
 b_max = R * A(R)**(-1/2)
 
-b, theta_star = np.transpose(np.loadtxt('theta_star_inf_out/theta_star_inf_R_{0}_Nu_{1}_Nb_{2}'.format(R,int(np.log10(N_u)),int(np.log10(N_b)))))
+b, theta_star = np.transpose(np.loadtxt("theta_star_inf_out/theta_star_inf_R_{0}_Nu_{1}_Nb_{2}".format(R,int(np.log10(N_u)),int(np.log10(N_b)))))
 theta_star_b = interpolate.interp1d(b,theta_star)
+
+cSB = "SteelBlue"
 
 fig, ax = plt.subplots(1,1,figsize=(6,4))
 ax.plot(b,theta_star,color = cSB) 
-ax.axvline(b_max,color='k',linestyle='dashed')
-ax.set_xlabel(r'$b$')
-ax.set_ylabel(r'$ \theta_*(b) $')
-ax.set_title(r'$R = {0}$'.format(R))
+ax.axvline(b_max,color='k',linestyle="dashed")
+ax.set_xlabel(r"$b$")
+ax.set_ylabel(r"$ \theta_*(b) $")
+ax.set_title(r"$R = {0}$".format(R))
 plt.show()
 
 #%%
 
-if not os.path.isdir('LBS_out'):
-       os.makedirs('LBS_out')
+if not os.path.isdir("LBS_out"):
+       os.makedirs("LBS_out")
 
-def generate_LBS(R,psi,beam):
+def generate_LBS(R = 2.5,psi = 1,beam = 0):
 
     N_b = 1e5
     rpsi = radians(psi)
@@ -134,11 +142,11 @@ def generate_LBS(R,psi,beam):
     I_obs = np.delete(I_obs,indx_nan)
     theta_0_array = np.delete(theta_0_array,indx_nan)
 
-    np.savetxt('LBS_out/LBS_R_{0}_psi_{1}_beam_{2}_test'.format(R,psi,beam),np.transpose([theta_0_array,I_obs]))
+    np.savetxt("LBS_out/LBS_R_{0}_psi_{1}_beam_{2}_test".format(R,psi,beam),np.transpose([theta_0_array,I_obs]))
 
 #%%
 
-#generate_LBS(2.5,1,0)
+#generate_LBS()
 
 #%%
 
@@ -146,24 +154,24 @@ R = 2.5
 psi = 1
 beam = 0
 
-theta, LBS = np.transpose(np.loadtxt('LBS_out/LBS_R_{0}_psi_{1}_beam_{2}'.format(R,psi,beam)))
+theta, LBS = np.transpose(np.loadtxt("LBS_out/LBS_R_{0}_psi_{1}_beam_{2}".format(R,psi,beam)))
 LBS_theta = interpolate.interp1d(theta,LBS)
 
 indx_terminator = np.where(LBS <= 1e-7)[0][0]
 
 fig, ax = plt.subplots(1,1,figsize=(6,4))
 ax.plot(theta / pi,LBS_theta(theta),color=cSB) 
-ax.axvline(theta[indx_terminator] / pi,color='k',linestyle='dashed')
-ax.set_xlabel(r'$\theta_0 / \pi$')
-ax.set_ylabel(r'$ \kappa(\theta_0) $')
-ax.set_title(r'$R = {0}$'.format(R))
+ax.axvline(theta[indx_terminator] / pi,color='k',linestyle="dashed")
+ax.set_xlabel(r"$\theta_0 / \pi$")
+ax.set_ylabel(r"$ \kappa(\theta_0) $")
+ax.set_title(r"$R = {0}$".format(R))
 plt.show()
 
 #%%
 
 def norm_LBS(phi,R,psi,beam,alpha,chi):
     
-    theta, LBS = np.transpose(np.loadtxt('LBS_out/LBS_R_{0}_psi_{1}_beam_{2}'.format(R,psi,beam)))
+    theta, LBS = np.transpose(np.loadtxt("LBS_out/LBS_R_{0}_psi_{1}_beam_{2}".format(R,psi,beam)))
     LBS_theta = interpolate.interp1d(theta,LBS)
     
     alpha_rad = radians(alpha)
@@ -189,12 +197,12 @@ phi_lst = np.linspace(0,2 * pi,int(1e3))
 
 fig, ax = plt.subplots(1,1,figsize=(6,4))
 ax.plot(phi_lst / (2 * pi),norm_LBS(phi_lst,R,psi,beam,alpha,chi),color=cSB) 
-ax.axvline(theta[indx_terminator] / (2 * pi),color='k',linestyle='dashed')
-ax.axvline(1 - theta[indx_terminator + 1] / (2 * pi),color='k',linestyle='dashed')
+ax.axvline(theta[indx_terminator] / (2 * pi),color='k',linestyle="dashed")
+ax.axvline(1 - theta[indx_terminator + 1] / (2 * pi),color='k',linestyle="dashed")
 ax.set_xlim(0,1)
-ax.set_xlabel(r'$\phi/2\pi$')
-ax.set_ylabel(r'$ \rm{Normalized\ LBS} $')
-ax.set_title(r'$R = {0}$'.format(R))
+ax.set_xlabel(r"$\phi/2\pi$")
+ax.set_ylabel(r"$ \rm{Normalized\ LBS} $")
+ax.set_title(r"$R = {0}$".format(R))
 plt.show()
 
 #%%
@@ -210,20 +218,20 @@ plt.show()
 
 # skewed Laplace probability density function
 def skewed_Laplace_pdf(t,t0,A,s):
-    t_t0 = lambda t: A / (s + 1 / s) * exp(A * (t - t0) / s)
-    t0_t = lambda t: A / (s + 1 / s) * exp(- A * s * (t - t0))
+    t_t0 = lambda t: A / (s + 1 / s) * exp(A * s * (t - t0))
+    t0_t = lambda t: A / (s + 1 / s) * exp(- A * (t - t0) / s)
     return np.piecewise(t, [t < t0, t >= t0], [t_t0,t0_t]) 
 
 # skewed Laplace cumulative density function
 def skewed_Laplace_cdf(t,t0,A,s):    
-    t_t0 = lambda t: s**2 / (1 + s**2) * exp(A * (t - t0) / s)
-    t0_t = lambda t: 1 - 1 / (1 + s**2) * exp(- A * s * (t - t0))
+    t_t0 = lambda t: 1 / (1 + s**2) * exp(A * s * (t - t0))
+    t0_t = lambda t: 1 - s**2 / (1 + s**2) * exp(- A * (t - t0) / s)
     return np.piecewise(t, [t <= t0, t > t0], [t_t0,t0_t]) 
-        
+
 # skewed Laplace point percent function
 def skewed_Laplace_ppf(q,t0,A,s):
-    XminM = lambda q: t0 + log((1 + s**2) * q / s**2) * s / A
-    XplusM = lambda q: t0 - log((1 - q) * (1 + s**2)) / s / A
+    XminM = lambda q: t0 + log((1 + s**2) * q) / (A * s)
+    XplusM = lambda q: t0 - log((1 - q) * (1 + s**2) / s**2) * s / A
     return np.piecewise(q, [t0 > XminM(q), t0 < XplusM(q)], [XminM(q),XplusM(q)])
         
 #%%
@@ -241,10 +249,10 @@ def burst_model_cdf(t,t0,A,s,N,bg_rate,offset):
 #    return np.piecewise(q, [t0 > XminM(q), t0 < XplusM(q)], [XminM(q),XplusM(q)])
 
 def DT_burst(ysig,A,s,N,b,bw):
-    return - (1 + s**2)/(A * s) * log( (s + 1 / s)/(N * A * bw) * (ysig - b))
+    return - (s + 1 / s)/ A * log((s + 1 / s)/(N * A * bw) * (ysig - b))
 
 def C1(s,Dt):
-    return (1 + s**2) / (s * Dt)
+    return (s + 1 / s) / Dt
     
 def C2(ysig,s,b,bw):
     return (s + 1 / s) * (ysig - b) / bw
@@ -302,23 +310,18 @@ neg = True
 
 #%%
 
-def reduced_Chi_squared(res,err,dof):
-    return sum((res / err)**2) / dof
-
-#%%
-
 R0 = 2.5
 psi0 = 1
 beam0 = 0
-alpha0 = 45
-chi0 = 45
+alpha0 = 0
+chi0 = 0
 
 P = 6
-t0 = 1.3 * P
+t0 = 1.5 * P
 s0 = 1
 bg0 = 3
 
-bw = 1 / 200
+bw = 1 / 100
 rate0 = bg0 / bw 
 
 sig4 = 0.997
@@ -334,6 +337,7 @@ N0 = ceil(Ncounts(y0,A0,s0,bg0,bw,Dt_list[burst_nr]))
 
 t_max = 3 * P
 N_bins = int(t_max / bw)
+print(N_bins)
 
 phi = np.linspace(0,2 * pi,int(1e5))
 f = interpolate.interp1d(phi,norm_LBS(phi,R0,psi0,beam0,alpha0,chi0))
@@ -398,6 +402,7 @@ indx_sig = np.where(y >= sig_level)[0]
 x_sig = x_check[indx_sig]
 y_sig = y_check[indx_sig]
 
+#j = 0
 while len(y_sig) > 0:
     
     indx_y_sig_max = np.argmax(y_sig)
@@ -445,12 +450,14 @@ while len(y_sig) > 0:
     N_in_calc = N_in_func(t_int,dt_int)
    
     initial_pars = [t0_sig_max,A0,s0,N_in_calc]
-
+        
     pl = PoissonPosterior(x_fit, y_fit / bw, lambda t,t0,A,s,N: burst_model_pdf(t,t0,A,s,N,rate0))                      
     res = fitmethod(pl, initial_pars, args=(neg,),method = 'Nelder-Mead')
     popt = res.x  
     
-    
+#    np.savetxt('test_lc_Daniela/test_pars_data{}'.format(j),np.transpose([pars[:4],initial_pars,popt]))
+#    np.savetxt('test_lc_Daniela/test_lc_data{}'.format(j),np.transpose([x_fit,y_fit / bw]))
+#    j += 1
     
     x_m = np.linspace(0,t_max,int(1e4))
     
@@ -896,12 +903,8 @@ plt.plot(bins[:-1],counts)
 plt.xlim(0,2)
 
 #%%
-
-
 length = len(data)
 ch_sort = sorted(np.transpose(data)[1])
-
-
 
 #%%
 #from time import strftime, localtime
@@ -924,3 +927,58 @@ ch_sort = sorted(np.transpose(data)[1])
 #
 #print(time_in)
 #print(strftime('%H:%M:%S', localtime()))
+
+#%%
+import astropy.modeling.models as models
+from astropy.modeling.models import custom_model
+
+from stingray.modeling.posterior import PoissonLogLikelihood, PoissonPosterior
+from stingray.modeling.parameterestimation import ParameterEstimation
+
+@custom_model
+def burst_model_pdf(t,t0,A,s,N,bg_rate):
+    return N * skewed_Laplace_pdf(t,t0,A,s) + bg_rate
+
+data = np.transpose(np.loadtxt('./test_lc_Daniela/test_lc_data0'))
+data_par = np.transpose(np.loadtxt('./test_lc_Daniela/test_pars_data0'))
+
+x, counts = data
+par_input, par_init, par_bf = data_par
+
+#%%
+
+mm = burst_model_pdf(t0=1,A=1,s=1,N=2000,bg_rate=300)
+
+#%%
+
+mm.param_names
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
